@@ -15,13 +15,17 @@
         transpiler = babelTranspile;
         transpilerModule = isNode ? require('babel-core') : __global.babel;
       }
+      else if (this.transpiler == 'typescript') {
+        transpiler = typescriptTranspile;
+        transpilerModule = isNode ? require('typescript') : __global.ts;
+      }
       else {
         transpiler = traceurTranspile;
         transpilerModule = isNode ? require('traceur') : __global.traceur;
       }
       
       if (!transpilerModule)
-        throw new TypeError('Include Traceur or Babel for module syntax support.');
+        throw new TypeError('Include Traceur, Babel or TypeScript for module syntax support.');
     }
 
     return 'var __moduleAddress = "' + load.address + '";' + transpiler.call(this, load);
@@ -71,5 +75,57 @@
     return source + '\n//# sourceURL=' + load.address + '!eval';
   }
 
+function defineShim(dependencyNames, module) {
+  var deps = dependencyNames.slice(2);
+    return System.register(deps, function ($__export) {
+      var require = {};
+      var exports = {};
+      var imports = [require, exports];
+      var setters = [];
+      for (var i = 0, n = deps.length; i < n; i++) {
+          setters.push((function (index) {
+              return function (v) { imports[2+index] = v; };
+          })(i));
+      }
+
+      return {
+          setters: setters,
+          execute: function () {
+              module.apply(undefined, imports);
+              for (var i in exports) {
+                  $__export(i, exports[i]);
+              }
+          }
+        };
+    });
+}
+
+function typescriptTranspile(load) {
+  var ts = transpilerModule;
+  var options = this.typescriptOptions || {};
+  options.module = ts.ModuleKind.AMD;
+
+  var contents = load.source;
+  var inputName = 'file1.ts';
+  var output = 'var define = ' + defineShim.toString()  + "; ";
+  var sourceFile = ts.createSourceFile(inputName, contents , ts.ScriptTarget.ES5);
+
+  var compilerHost = {
+    getSourceFile: function (fileName, target) {
+      return fileName === inputName ? ts.createSourceFile(fileName, contents , target) : undefined;
+    },
+    writeFile: function(name, text) { output += text;},
+    getDefaultLibFileName: function() { return "lib.d.ts"; },
+    useCaseSensitiveFileNames: function() {return false; },
+    getCanonicalFileName: function(fileName) { return fileName; },
+    getCurrentDirectory: function() { return ""; },
+    getNewLine: function() { return "\n"; }
+  };
+
+  var program = ts.createProgram([inputName], options, compilerHost);
+  var emitResult = program.emit();
+
+  return output;
+}
 
 })(__global.LoaderPolyfill);

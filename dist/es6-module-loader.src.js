@@ -1579,10 +1579,6 @@ function logloads(loads) {
           // 15.2.4.6.1 AddDependencyLoad (load is parentLoad)
           .then(function(depLoad) {
 
-            console.assert(!load.dependencies.some(function(dep) {
-              return dep.key == request;
-            }), 'not already a dependency');
-
             // adjusted from spec to maintain dependency order
             // this is due to the System.register internal implementation needs
             load.dependencies[index] = {
@@ -2395,13 +2391,17 @@ function logloads(loads) {
         transpiler = babelTranspile;
         transpilerModule = isNode ? require('babel-core') : __global.babel;
       }
+      else if (this.transpiler == 'typescript') {
+        transpiler = typescriptTranspile;
+        transpilerModule = isNode ? require('typescript') : __global.ts;
+      }
       else {
         transpiler = traceurTranspile;
         transpilerModule = isNode ? require('traceur') : __global.traceur;
       }
       
       if (!transpilerModule)
-        throw new TypeError('Include Traceur or Babel for module syntax support.');
+        throw new TypeError('Include Traceur, Babel or TypeScript for module syntax support.');
     }
 
     return 'var __moduleAddress = "' + load.address + '";' + transpiler.call(this, load);
@@ -2451,6 +2451,58 @@ function logloads(loads) {
     return source + '\n//# sourceURL=' + load.address + '!eval';
   }
 
+function defineShim(dependencyNames, module) {
+  var deps = dependencyNames.slice(2);
+    return System.register(deps, function ($__export) {
+      var require = {};
+      var exports = {};
+      var imports = [require, exports];
+      var setters = [];
+      for (var i = 0, n = deps.length; i < n; i++) {
+          setters.push((function (index) {
+              return function (v) { imports[2+index] = v; };
+          })(i));
+      }
+
+      return {
+          setters: setters,
+          execute: function () {
+              module.apply(undefined, imports);
+              for (var i in exports) {
+                  $__export(i, exports[i]);
+              }
+          }
+        };
+    });
+}
+
+function typescriptTranspile(load) {
+  var ts = transpilerModule;
+  var options = this.typescriptOptions || {};
+  options.module = ts.ModuleKind.AMD;
+
+  var contents = load.source;
+  var inputName = 'file1.ts';
+  var output = 'var define = ' + defineShim.toString()  + "; ";
+  var sourceFile = ts.createSourceFile(inputName, contents , ts.ScriptTarget.ES5);
+
+  var compilerHost = {
+    getSourceFile: function (fileName, target) {
+      return fileName === inputName ? ts.createSourceFile(fileName, contents , target) : undefined;
+    },
+    writeFile: function(name, text) { output += text;},
+    getDefaultLibFileName: function() { return "lib.d.ts"; },
+    useCaseSensitiveFileNames: function() {return false; },
+    getCanonicalFileName: function(fileName) { return fileName; },
+    getCurrentDirectory: function() { return ""; },
+    getNewLine: function() { return "\n"; }
+  };
+
+  var program = ts.createProgram([inputName], options, compilerHost);
+  var emitResult = program.emit();
+
+  return output;
+}
 
 })(__global.LoaderPolyfill);/*
 *********************************************************************************************
@@ -2464,7 +2516,9 @@ function logloads(loads) {
 *********************************************************************************************
 */
 
-
+var $__Object$getPrototypeOf = Object.getPrototypeOf;
+var $__Object$defineProperty = Object.defineProperty;
+var $__Object$create = Object.create;
 
 (function() {
   var isWorker = typeof self !== 'undefined' && typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope;

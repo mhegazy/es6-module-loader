@@ -65,6 +65,7 @@
   "dependencies": {
     "babel-core": "^4.6.6",
     "traceur": "0.0.86",
+    "typescript": "^1.4",
     "when": "^3.7.2"
   }
 }
