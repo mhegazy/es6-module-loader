@@ -17,7 +17,12 @@
     <p>Check the console in your browser developer tools! This code is currently loaded in the page:</p>
     <pre>
   &lt;script src="../node_modules/traceur/bin/traceur.js">&lt;/script>
+  &lt;script src="../node_modules/typescript/bin/typescriptServices.js">&lt;/script>
+    &lt;script>
+     System.transpiler = 'typescript';
+  &lt;/script>
   &lt;script src="../dist/es6-module-loader.js">&lt;/script>
+
   &lt;script type="module">
     import { hello } from 'test1';
     console.log(hello); // -> world
@@ -45,8 +50,12 @@
   <footer>
   </footer>
 
+  <script src="../node_modules/typescript/bin/typescriptServices.js"></script>
   <script src="../node_modules/traceur/bin/traceur.js"></script>
   <script src="../dist/es6-module-loader.js"></script>
+  <script>
+    System.transpiler = 'typescript';
+  </script>
   <script type="module">
     import { hello } from 'test1';
     console.log(hello); // -> world
